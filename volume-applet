@@ -1,0 +1,343 @@
+#!/usr/bin/python
+
+########### VOLUME_APPLET #####################################################
+# Author: Mitchell Nemitz [mitchell.nemitz@gmail.com]                         #
+# Purpose: A simple tray applet to adjust the Master volume.                  #
+# Description: Uses python alsa bindings to set and get the volume.           #
+###############################################################################
+
+import sys, os, os.path, subprocess
+
+try:
+    import pygtk
+except:
+    print "error : pygtk : moduled failed to import\nDebian: Install pygtk\nArch:   Install pygtk\n"
+    exit()
+
+try: 
+    pygtk.require('2.0')
+except:
+    print "error : pygtk : failed to force GTK+2.0 requirement\nMake sure GTK+2.0 is installed on your system.\n"
+    exit()
+
+try:
+    import gtk
+except:
+    print "error : gtk   : module failed to import\nMake sure GTK+2.0 is installed on your system.\n"
+    exit()
+
+name = 'Volume Control'
+version = '0.5.1'
+
+comments = \
+'''Volume Control is a simple tool to adjust your volume levels.
+It is written in python and supports multiple audio backends.\n
+Written by Mitchell Nemitz [mitchell.nemitz@gmail.com]\n
+Rewrite and Pulse Audio support by Sepero: sepero 111 @ gmail. com\n'''
+
+helptext = \
+'''usage: volume_applet [option]\n
+Options:
+-h, --help                   show this help text
+-i, --increase               increase volume by 5%
+-d, --decrease               decrease volume by 5%
+-m, --mute                   mute or unmute volume
+-s, --set                    set volume to integer'''
+
+class About(gtk.AboutDialog):
+    def __init__(self):
+        gtk.AboutDialog.__init__(self)
+        self.set_program_name(name)
+        self.set_version(version)
+        self.set_comments(comments)
+    
+    def display(self, widget, event):
+        self.run()
+        self.hide()
+            
+class Preferences(gtk.Window):
+    def __init__(self, backend):
+        gtk.Window.__init__(self)
+        self.set_title("Volume Applet - Preferences")
+        self.set_size_request(600, 350)
+        
+        vbox  = gtk.VBox(homogeneous=False)
+        hbox1 = gtk.HBox(homogeneous=False)
+        hbox2 = gtk.HBox(homogeneous=False)
+        
+        icon    = gtk.CheckButton(label="Use Default Icon? ")
+        heading = gtk.Label()
+        
+        heading.set_markup("<b>Preferences</b>")
+        heading.set_alignment(0, 0.5)
+        heading.set_padding(5, 15)
+        
+        hbox1.pack_start(icon, expand=False, fill=True)
+        vbox.pack_start(heading, expand=False, fill=True)
+        vbox.pack_start(hbox1, expand=False, fill=True)
+        self.add(vbox)
+        
+        vbox.show_all()
+        hbox1.show()
+        hbox2.show()
+        icon.show()
+        
+    def display(self, widget, event):
+        if self.get_property('visible'): self.hide()
+        else: self.show()
+        
+    def apply(self, widget, data=None):
+        pass
+    
+    def apply_close(self, widget, data=None):
+        pass
+
+class Slider(gtk.VScale):
+    def __init__(self, backend):
+        gtk.VScale.__init__(self)
+        self.set_inverted(True)
+        self.set_range(0, 100)
+        self.set_increments(1, 10)
+        self.set_digits(0)
+        self.set_size_request(34, 160)
+        self.set_value_pos(gtk.POS_BOTTOM)
+        self.set_value(backend.get_volume())
+        self.connect('value-changed', self.set_volume, backend)
+        
+    def set_volume(self, widget, backend):
+        backend.set_volume(self.get_value())
+
+class Mute(gtk.CheckButton):
+    def __init__(self, backend):
+        gtk.CheckButton.__init__(self, label="mute")
+        self.connect('toggled', self.toggle_mute, backend)
+        
+    def toggle_mute(self, widget, backend):
+        print "set_mute"
+        backend.set_mute(self.get_active())
+
+class Boost(gtk.CheckButton):
+    def __init__(self, backend):
+        gtk.CheckButton.__init__(self, label="boost")
+        self.connect('toggled', self.toggle_boost, backend)
+        
+    def toggle_boost(self, widget, backend):
+        print "set_boost"
+        backend.set_boost(self.get_active())
+
+class Menu(gtk.Menu):
+    def __init__(self, about, prefs):
+        gtk.Menu.__init__(self)
+        menu_sets  = gtk.ImageMenuItem(gtk.STOCK_EXECUTE)
+        menu_prefs = gtk.ImageMenuItem(gtk.STOCK_PREFERENCES)
+        menu_about = gtk.ImageMenuItem(gtk.STOCK_ABOUT)
+        menu_quit  = gtk.ImageMenuItem(gtk.STOCK_QUIT)
+        
+        menu_sets.set_label("_Audio Settings")
+        
+        self.append(menu_sets)
+        self.append(gtk.SeparatorMenuItem())
+        self.append(menu_prefs)
+        self.append(menu_about)
+        self.append(gtk.SeparatorMenuItem())
+        self.append(menu_quit)
+        
+        menu_sets.connect( 'button-press-event', self.settings)
+        menu_prefs.connect('button-press-event', prefs.display)
+        menu_about.connect('button-press-event', about.display)
+        menu_quit.connect( 'button-press-event', gtk.main_quit)
+        
+    def settings(self, widget, data=None):
+        global settings
+        if settings == "internal":
+            gtk.Window(gtk.WINDOW_TOPLEVEL).present()
+            return 0
+        else:
+            subprocess.Popen(settings)
+        
+    def display(self, widget, button, time):
+        #print self, widget, button, time
+        if button == 3:
+            self.show_all()
+            self.popup(None, None, None, 3, time)
+
+class Window(gtk.Window):
+    #def __init__(self, slider, mute, boost, backend):
+    def __init__(self, slider, mute, backend):
+        gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
+        self.set_decorated(False)
+        self.set_skip_taskbar_hint(True)
+        self.set_skip_pager_hint(True)
+        
+        vbox = gtk.VBox()
+        vbox.set_homogeneous(False)
+        vbox.add(slider)
+        vbox.add(mute)
+        #vbox.add(boost)
+        
+        frame = gtk.Frame()
+        frame.add(vbox)
+        
+        self.add(frame)
+        
+        # SOOOO UGLY!!!!
+        # Needed for window positioning... GTK assumes 200x200
+        # until the widgets are packed and shown... BAH!
+        self.show_all()
+        self.hide()
+        
+    def lost_focus(self, widget, event, slider, mute, backend):
+        #print "Lost focus..."
+        self.hide()
+        
+    def display(self, widget, event, slider, mute, backend):
+        if self.get_property('visible'):
+            #print "Hiding window..."
+            self.hide()
+        else:
+            slider.set_value(backend.get_volume())
+            mute.set_active(backend.get_mute())
+            
+            position = widget.position(self.get_size())
+            self.move(position[0], position[1])
+            
+            self.show_all()
+            self.present()
+
+class Applet(gtk.StatusIcon):
+    def __init__(self, window, menu, slider, mute, backend):
+        gtk.StatusIcon.__init__(self)
+        
+        if stockicon: self.set_from_stock(gtk.STOCK_MEDIA_RECORD)
+        else:         self.set_from_file(icon)
+        
+        window.connect( 'focus-out-event', window.lost_focus, slider, mute, backend )
+        self.connect(   'activate',        window.display, None, slider, mute, backend)
+        self.connect(   'popup-menu',      menu.display)
+        self.connect(   'scroll-event',    self.scroll, backend, slider  )
+    
+    def scroll(self, widget, event, backend, slider):
+        if event.direction == gtk.gdk.SCROLL_UP:
+            volume = slider.get_value()+5
+            
+            if volume > 100: slider.set_value(100)
+            else:            slider.set_value(volume)
+            
+        if event.direction == gtk.gdk.SCROLL_DOWN:
+            volume = slider.get_value()-5
+            
+            if volume < 0: slider.set_value(0)
+            else:          slider.set_value(volume)
+    
+    def position(self, size):
+        screen, position, orientation = self.get_geometry()
+        
+        width  = screen.get_width()
+        height = screen.get_height()
+        
+        size_x, size_y = size
+        
+        #print width
+        #print height
+        #print size_x
+        #print size_y
+        #print position[0]
+        #print position[1]
+        #print position[2]
+        #print position[3]
+        
+        if orientation == gtk.ORIENTATION_HORIZONTAL:
+            x = (position[0] + (position[2] / 2)) - (size_x / 2)
+            y = position[1]
+            
+            #print "X: " + str(x)
+            #print "Y: " + str(y)
+        
+        if orientation == gtk.ORIENTATION_VERTICAL:
+            pass
+        
+        return (x, y)
+
+def set_backend():
+    global backend
+    global subsystem
+    
+    if subsystem == "alsa":
+        from VolumeAppletBackends import PulseAudio
+        backend = PulseAudio()
+        
+    elif subsystem == "oss":
+        from VolumeAppletBackends import OSS # TODO
+        backend = OSS()
+        
+    elif subsystem == "esd":
+        from VolumeAppletBackends import ESD # TODO
+        backend = ESD()
+        
+    elif subsystem == "jack":
+        from VolumeAppletBackends import JACK # TODO
+        backend = JACK()
+        
+    elif subsystem == "pulse":
+        from VolumeAppletBackends import PULSE # TODO
+        backend = PULSE()
+        
+    else:
+        print "You somehow don't have any audio backend modules..."
+        print "You really screwed up. Try reinstalling volume-applet."
+        exit()
+        
+def read_config():
+    import ConfigParser
+    
+    global stockicon
+    global icon
+    global subsystem
+    global settings
+    
+    configfile = os.path.join(os.getenv("HOME"), '.volapp')
+    
+    if os.path.isfile(configfile):
+        parser = ConfigParser.SafeConfigParser()
+        parser.read(configfile)
+        
+        try:
+            stockicon = parser.getboolean( 'volume-applet', 'default-icon'  )
+            icon      = parser.get(        'volume-applet', 'icon'          )
+            subsystem = parser.get(        'volume-applet', 'audio-backend' )
+            settings  = parser.get(        'volume-applet', 'settings'      )
+        except:
+            print "Error importing configuration..."
+            exit()
+    
+    else:
+        try:
+            configfile = open(configfile, 'w')
+            parser = ConfigParser.SafeConfigParser()
+            parser.add_section('volume-applet')
+            parser.set('volume-applet', 'default-icon',  'true')
+            parser.set('volume-applet', 'icon',          '/usr/share/icons/default.kde4/32x32/status/audio-volume-low.png')
+            parser.set('volume-applet', 'audio-backend', 'alsa')
+            parser.set('volume-applet', 'settings',      'internal')
+            parser.write(configfile)
+        except:
+            print "Error writing default configuration..."
+            exit()
+            
+def main():
+    read_config()
+    set_backend()
+    
+    about   = About()
+    prefs   = Preferences(backend)
+    slider  = Slider(backend)
+    mute    = Mute(backend)
+    boost   = Boost(backend)
+    menu    = Menu(about, prefs)
+    window  = Window(slider, mute, backend)
+    applet  = Applet(window, menu, slider, mute, backend)
+    
+    gtk.main()
+
+if __name__ == '__main__':
+    main()
