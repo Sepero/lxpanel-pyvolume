@@ -4,6 +4,7 @@ lxpanel-pyvolume
 Pulse Audio Volume Control Applet for Lxpanel and other common Linux Desktop panels.
 This applet will allow you to simply turn up/down the pulseaudio volume.
 
+The executable is volume-applet.
 This applet is incomplete, but basic functionality works. I am posting it for anyone
 who may wish to improve it. Written in Python. All patches are welcome. Original code by Mitchell Nemitz.
 
