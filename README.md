@@ -13,4 +13,4 @@ Bugs/Issues-
 There is some bug with using Mute.
 Audio Settings and Preferences have not been implemented.
 
-sepero 111 @ gmail . com
+sepero 111 @ gmx . com
