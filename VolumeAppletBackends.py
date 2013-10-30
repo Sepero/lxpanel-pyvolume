@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
-### VOLUME-APPLET ########################################
-# This is a collection of backends for volume-applet     #
-# written by Mitchell Nemitz [mitchell.nemitz@gmail.com] #
-##########################################################
+### VOLUME-APPLET ##############################################
+# This is a collection of backends for volume-applet           #
+# written by Mitchell Nemitz [mitchell . nemitz @ gmail . com] #
+################################################################
 
 import sys, os
 
