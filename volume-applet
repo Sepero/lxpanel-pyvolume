@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 ########### VOLUME_APPLET #####################################################
-# Author: Mitchell Nemitz [mitchell.nemitz@gmail.com]                         #
+# Author: Mitchell Nemitz [mitchell . nemitz @ gmail . com]                   #
 # Purpose: A simple tray applet to adjust the Master volume.                  #
 # Description: Uses python alsa bindings to set and get the volume.           #
 ###############################################################################
@@ -32,7 +32,7 @@ version = '0.5.1'
 comments = \
 '''Volume Control is a simple tool to adjust your volume levels.
 It is written in python and supports multiple audio backends.\n
-Written by Mitchell Nemitz [mitchell.nemitz@gmail.com]\n
+Written by Mitchell Nemitz [mitchell . nemitz @ gmail . com]\n
 Rewrite and Pulse Audio support by Sepero: sepero 111 @ gmail. com\n'''
 
 helptext = \
